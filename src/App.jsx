@@ -5,19 +5,28 @@ function App() {
   // --- 状態管理（State） ---
   const [baseInput, setBaseInput] = useState(1200000); // 初期値120万円
   const [isMonthly, setIsMonthly] = useState(false); // false:年額, true:月額
-  const [startMonths, setStartMonths] = useState(65 * 12); // 初期値 65歳0ヶ月（月数で管理）
+  const [startMonths, setStartMonths] = useState(65 * 12); // 初期値 65歳0ヶ月（月数管理）
+
+  const MIN_MONTHS = 60 * 12; // 60歳0ヶ月
+  const MAX_MONTHS = 75 * 12; // 75歳0ヶ月
+
+  // --- 微調整用ハンドラー ---
+  const handleDecrement = () => {
+    setStartMonths((prev) => Math.max(MIN_MONTHS, prev - 1));
+  };
+
+  const handleIncrement = () => {
+    setStartMonths((prev) => Math.min(MAX_MONTHS, prev + 1));
+  };
 
   // --- 計算ロジック ---
-  // 1. 基準となる「年額」と「月額」
   const baseYearly = isMonthly ? baseInput * 12 : baseInput;
   const baseMonthly = baseYearly / 12;
 
-  // 2. 選択された年齢と65歳との差分
   const selectedYear = Math.floor(startMonths / 12);
   const selectedMonth = startMonths % 12;
   const diffMonths = startMonths - (65 * 12); // M (マイナスなら繰上げ、プラスなら繰下げ)
 
-  // 3. 増減率の計算
   let rate = 0;
   if (diffMonths < 0) {
     rate = Math.abs(diffMonths) * -0.004; // 繰上げ: 1ヶ月 -0.4%
@@ -25,7 +34,6 @@ function App() {
     rate = diffMonths * 0.007; // 繰下げ: 1ヶ月 +0.7%
   }
 
-  // 4. 調整後の受給額
   const adjustedYearly = baseYearly * (1 + rate);
   const adjustedMonthly = adjustedYearly / 12;
 
@@ -35,10 +43,8 @@ function App() {
     const diffAmount = adjustedMonthly - baseMonthly;
     if (diffAmount === 0) return null;
 
-    // 累計額が一致する月数を一次方程式で計算
     const breakEvenTotalMonths = ((startMonths * adjustedMonthly) - ((65 * 12) * baseMonthly)) / diffAmount;
     
-    // 繰下げの場合、まだ受給開始していない年齢での分岐は除外
     if (diffMonths > 0 && breakEvenTotalMonths <= startMonths) return null;
 
     return {
@@ -53,11 +59,9 @@ function App() {
     for (let age = 60; age <= 95; age++) {
       const ageMonths = age * 12;
       
-      // 65歳開始の累計（万円）
       const baseTotalMonths = Math.max(0, ageMonths - (65 * 12));
       const baseTotal = (baseMonthly * baseTotalMonths) / 10000;
       
-      // 選択年齢開始の累計（万円）
       const selectedTotalMonths = Math.max(0, ageMonths - startMonths);
       const selectedTotal = (adjustedMonthly * selectedTotalMonths) / 10000;
 
@@ -77,7 +81,7 @@ function App() {
 
       {/* 入力セクション */}
       <div style={{ background: '#f7f9fc', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
-        <h3>1. 基準額（65歳受給時の金額）を入力</h3>
+        <h3>1. 基準額（65歳の受給額）を入力</h3>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <input 
             type="number" 
@@ -96,16 +100,70 @@ function App() {
           </select>
         </div>
 
-        <h3 style={{ marginTop: '20px' }}>2. 受給開始時期を選択 ({selectedYear}歳 {selectedMonth}ヶ月)</h3>
+        <h3 style={{ marginTop: '20px' }}>2. 年金受給開始時期を選択</h3>
+        
+        {/* 表記枠 ＋ 微調整ボタン */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
+          <button 
+            onClick={handleDecrement}
+            disabled={startMonths <= MIN_MONTHS}
+            style={{
+              padding: '12px 16px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              borderRadius: '8px',
+              border: '1px solid #cbd5e0',
+              background: startMonths <= MIN_MONTHS ? '#edf2f7' : '#ffffff',
+              color: startMonths <= MIN_MONTHS ? '#a0aec0' : '#2d3748',
+              cursor: startMonths <= MIN_MONTHS ? 'not-allowed' : 'pointer',
+              userSelect: 'none'
+            }}
+          >
+            ◀ -1ヶ月
+          </button>
+
+          <div style={{
+            flex: 1,
+            textAlign: 'center',
+            background: '#ebf4ff',
+            color: '#2b6cb0',
+            padding: '12px',
+            borderRadius: '8px',
+            fontWeight: 'bold',
+            fontSize: '22px',
+            border: '2px solid #bee3f8'
+          }}>
+            {selectedYear}歳 {selectedMonth}ヶ月
+          </div>
+
+          <button 
+            onClick={handleIncrement}
+            disabled={startMonths >= MAX_MONTHS}
+            style={{
+              padding: '12px 16px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              borderRadius: '8px',
+              border: '1px solid #cbd5e0',
+              background: startMonths >= MAX_MONTHS ? '#edf2f7' : '#ffffff',
+              color: startMonths >= MAX_MONTHS ? '#a0aec0' : '#2d3748',
+              cursor: startMonths >= MAX_MONTHS ? 'not-allowed' : 'pointer',
+              userSelect: 'none'
+            }}
+          >
+            +1ヶ月 ▶
+          </button>
+        </div>
+
         <input 
           type="range" 
-          min={60 * 12} // 60歳0ヶ月
-          max={75 * 12} // 75歳0ヶ月
+          min={MIN_MONTHS} 
+          max={MAX_MONTHS} 
           value={startMonths}
           onChange={(e) => setStartMonths(Number(e.target.value))}
           style={{ width: '100%', cursor: 'pointer' }}
         />
-        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666', fontSize: '14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666', fontSize: '14px', marginTop: '5px' }}>
           <span>60歳</span>
           <span>65歳</span>
           <span>70歳</span>
@@ -122,13 +180,13 @@ function App() {
           (月額: {Math.round(adjustedMonthly).toLocaleString()} 円)
         </p>
         <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
-          増減率: {(rate * 100).toFixed(1)} % 
+          増減比率: {(rate * 100).toFixed(1)} % 
           （65歳比: {diffMonths === 0 ? "±0" : (adjustedYearly - baseYearly > 0 ? "+" : "") + Math.round(adjustedYearly - baseYearly).toLocaleString()} 円/年）
         </div>
       </div>
 
       {/* グラフセクション */}
-      <h3>3. 生涯受給額の推移（損益分岐点）</h3>
+      <h3>3. 生涯年金受給額の経過（損益分岐点）</h3>
       {breakEven && (
         <p style={{ fontWeight: 'bold', color: '#d69e2e', background: '#fffff0', padding: '10px', borderRadius: '5px' }}>
           💡 損益分岐点: {breakEven.year}歳 {breakEven.month}ヶ月で、65歳開始の受給総額を逆転します。
@@ -140,8 +198,8 @@ function App() {
           <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 10 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="age" />
-            <YAxis unit="万円" />
-            <Tooltip />
+            <YAxis unit="万" />
+            <Tooltip formatter={(value) => `${value.toLocaleString()} 万`} />
             <Legend />
             <Line type="monotone" dataKey="65歳開始 (基準)" stroke="#a0aec0" strokeWidth={2} />
             <Line type="monotone" dataKey="選択した年齢" stroke={diffMonths < 0 ? '#e53e3e' : '#3182ce'} strokeWidth={3} />
